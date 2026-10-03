@@ -100,6 +100,76 @@ function copyTree(srcDir, dstDir, appName) {
   }
 }
 
+/** 按所选协议皮生成 node skins 装配块（注入 __SKINS_START__/__SKINS_END__ 之间） */
+function nodeSkinsBlock(skins) {
+  const L = ['    skins: {', '      http: { port: Number(process.env.PORT || 3000) },'];
+  if (skins.includes('rest')) L.push("      rest: { enabled: true, prefix: '/api' },");
+  if (skins.includes('graphql')) L.push("      graphql: { enabled: true, path: '/graphql' },");
+  if (skins.includes('grpc')) L.push('      grpc: { enabled: true, port: Number(process.env.GRPC_PORT || 50051) },');
+  L.push('    },');
+  return L.join('\n');
+}
+
+/** python import 段：有皮即引入 build（无皮为空） */
+function pySkinsImportBlock(skins) {
+  return skins.length ? 'from store_gateway import build' : '';
+}
+
+/** 按所选协议皮生成 python 网关装配块（注入 # __SKINS_START__/# __SKINS_END__ 之间） */
+function pySkinsBlock(skins) {
+  const args = [];
+  if (skins.includes('rest')) args.push('rest={"enabled": True, "prefix": "/api"}');
+  if (skins.includes('graphql')) args.push('graphql={"enabled": True, "path": "/graphql"}');
+  if (skins.includes('grpc')) args.push('grpc={"enabled": True, "port": int(os.environ.get("GRPC_PORT", "50051"))}');
+  const call = args.length === 1 ? `build(store, ${args[0]})`
+    : `build(store,\n           ${args.join(',\n           ')})`;
+  return `    gw = ${call}\n    gw.run("127.0.0.1", int(os.environ.get("PORT", "3000")))`;
+}
+
+/** node 依赖注入：直接加皮包（替换文本以逗号开头，无皮为空以保持 JSON 合法） */
+function nodeDepsReplacement(skins) {
+  return skins.map((s) => `,\n    "${NODE_SKIN_PKG[s]}": "^0.1.0"`).join('');
+}
+
+/** python 依赖注入：用 gateway extras 承载三皮（避免 extras 与直连依赖双轨） */
+function pyDepsReplacement(skins) {
+  return skins.length ? `, "store-gateway-py[${skins.join(',')}]"` : '';
+}
+
+/** 标记区间替换（保留标记本身）；标记缺失即抛 ERR_TEMPLATE，不静默 */
+function replaceBlock(text, startMark, endMark, body) {
+  const s = text.indexOf(startMark), e = text.indexOf(endMark);
+  if (s < 0 || e < 0) throw new Error(`ERR_TEMPLATE 标记缺失：${startMark}`);
+  return text.slice(0, s + startMark.length) + (body ? '\n' + body : '') + '\n' + text.slice(e);
+}
+
+/** 字面量替换（依赖注入点）；标记缺失即抛 ERR_TEMPLATE，不静默 */
+function replaceLiteral(text, mark, body) {
+  if (!text.includes(mark)) throw new Error(`ERR_TEMPLATE 标记缺失：${mark}`);
+  return text.split(mark).join(body);
+}
+
+function replaceFile(file, fn) {
+  fs.writeFileSync(file, fn(fs.readFileSync(file, 'utf8')));
+}
+
+/** 按 lang 对生成物做标记替换（node：bootstrap.js + package.json；python：bootstrap.py + pyproject.toml） */
+function applySkins(target, lang, skins) {
+  if (lang === 'node') {
+    replaceFile(path.join(target, 'impl', 'bootstrap.js'),
+      (t) => replaceBlock(t, '// __SKINS_START__', '// __SKINS_END__', nodeSkinsBlock(skins)));
+    replaceFile(path.join(target, 'package.json'),
+      (t) => replaceLiteral(t, '__SKIN_DEPS__', nodeDepsReplacement(skins)));
+  } else {
+    replaceFile(path.join(target, 'impl', 'bootstrap.py'), (t) => {
+      const out = replaceBlock(t, '# __SKINS_IMPORT_START__', '# __SKINS_IMPORT_END__', pySkinsImportBlock(skins));
+      return replaceBlock(out, '# __SKINS_START__', '# __SKINS_END__', pySkinsBlock(skins));
+    });
+    replaceFile(path.join(target, 'pyproject.toml'),
+      (t) => replaceLiteral(t, ', "__SKIN_DEPS__"', pyDepsReplacement(skins)));
+  }
+}
+
 async function main() {
   const o = resolveOptions(process.argv.slice(2));
   if (o.help) { process.stdout.write(USAGE + '\n'); process.exit(0); }
@@ -134,6 +204,7 @@ async function main() {
   }
 
   copyTree(templateDir, target, appName);
+  applySkins(target, lang, skins);
   process.stdout.write(`已生成 ${lang} 应用骨架：${target}\n`);
   process.stdout.write(
     lang === 'node'
