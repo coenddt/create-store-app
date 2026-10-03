@@ -1,0 +1,5 @@
+{
+  "cases": [
+    { "name": "list Orders", "method": "GET", "path": "/api/Order", "expect": 200 }
+  ]
+}
