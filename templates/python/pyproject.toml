@@ -3,7 +3,7 @@ name = "__APP_NAME__"
 version = "1.0.0"
 description = "Data-driven app scaffolded by create-store-app (py-store)"
 requires-python = ">=3.10"
-dependencies = ["storepy>=3.3.0", "pymongo>=4.9"]
+dependencies = ["storepy>=3.3.0", "pymongo>=4.9", "__SKIN_DEPS__"]
 
 [build-system]
 requires = ["setuptools>=68"]

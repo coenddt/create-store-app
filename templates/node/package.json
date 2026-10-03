@@ -11,6 +11,7 @@
     "nodejs-store": "^3.3.0",
     "store-gateway-node": "^0.1.0",
     "mongodb": "^6.21.0"
+    __SKIN_DEPS__
   },
   "engines": { "node": ">=18" }
 }
