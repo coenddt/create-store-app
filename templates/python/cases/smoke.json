@@ -1,0 +1,5 @@
+{
+  "cases": [
+    { "name": "query Orders via store", "gql": "Order { _id, title, amount, status }", "expect": "list" }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "Order",
+  "description": "订单（示例模型）",
+  "fields": {
+    "_id": { "type": "string" },
+    "title": { "type": "string" },
+    "amount": { "type": "number" },
+    "status": { "type": "string" }
+  }
+}
