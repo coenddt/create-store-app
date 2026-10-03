@@ -6,13 +6,15 @@
 
 ```
 schema/Order.json   定义即数据：纯 JSON schema（无函数值）
-impl/bootstrap.py   入口：调用 py_store 的 create_app 初始化数据层
+impl/bootstrap.py   入口：create_app 初始化数据层后经 store-gateway 起协议面
 scripts/publish-defs.py  把定义发布到 meta-store
 seed/seed.json      示例种子数据
 cases/smoke.json    冒烟用例
 ```
 
-> Python 侧本轮只到数据层（`create_app`）；协议面（store-api-py / store-graphql-py）留待后续。
+> `impl/bootstrap.py` 在 `create_app` 初始化数据层后，用 `store-gateway` 起协议面；
+> 协议皮由脚手架的 `--skins` 决定（`rest` / `graphql` / `grpc`，至少 1 个），
+> 依赖经 `store-gateway-py[<皮...>]` extras 引入。
 
 ## schema 目录约定
 
@@ -45,11 +47,11 @@ META_URL=http://127.0.0.1:8600 python scripts/publish-defs.py
 ## 运行
 
 ```bash
-pip install pymongo storepy
+pip install -e .        # 依赖含 store-gateway-py[<由 --skins 决定的皮>]
 python impl/bootstrap.py
 ```
 
-环境变量：`MONGO_URI`（默认 `mongodb://127.0.0.1:27017`）、`MONGO_DB`（默认 `__APP_NAME__`）。
+环境变量：`MONGO_URI`（默认 `mongodb://127.0.0.1:27017`）、`MONGO_DB`（默认 `__APP_NAME__`）、`PORT`（默认 `3000`）、`GRPC_PORT`（选 `grpc` 时，默认 `50051`）。
 
 ## 降级事件如何查
 

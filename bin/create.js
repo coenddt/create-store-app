@@ -174,17 +174,21 @@ async function main() {
   const o = resolveOptions(process.argv.slice(2));
   if (o.help) { process.stdout.write(USAGE + '\n'); process.exit(0); }
 
-  // 默认值 / 交互 / 非 TTY 保护
-  if (!o.yes && !o.lang && !process.stdin.isTTY) fail('ERR_ARGS', '非交互终端请显式传 --lang（或用 --yes 取默认）');
+  // 非 TTY 且完全未指定（无 --yes / --lang）：
+  //   无 <target-dir> ⇒ 报错退 2（禁静默挂起）；给了 <target-dir> ⇒ 参数式调用，语言/皮取默认
+  if (!o.yes && !o.lang && !process.stdin.isTTY && !o.dir) {
+    fail('ERR_ARGS', '非交互终端请显式传 --lang（或用 --yes 取默认）');
+  }
+  const interactive = !o.yes && !o.lang && !!process.stdin.isTTY;   // 无 --yes / --lang 且 TTY ⇒ 进入问答
 
   let dir = o.dir;
   if (!dir) {
-    if (o.yes || !process.stdin.isTTY) fail('ERR_ARGS', '缺少 <target-dir>');
+    if (!interactive) fail('ERR_ARGS', '缺少 <target-dir>');
     dir = await askDir();
     if (!dir) fail('ERR_ARGS', '缺少 <target-dir>');
   }
-  const lang = o.lang || (o.yes ? DEFAULTS.lang : await askLang());
-  const skins = o.skins || (o.yes ? DEFAULTS.skins : await askSkins());
+  const lang = o.lang || (interactive ? await askLang() : DEFAULTS.lang);
+  const skins = o.skins || (interactive ? await askSkins() : DEFAULTS.skins);
   if (!skins.length) fail('ERR_ARGS', '至少选择 1 个协议皮');
 
   const templateDir = path.join(TEMPLATES, lang);

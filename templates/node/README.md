@@ -27,6 +27,18 @@ curl http://127.0.0.1:3000/api/Order
 环境变量：`MONGO_URI`（默认 `mongodb://127.0.0.1:27017`）、`MONGO_DB`（默认 `__APP_NAME__`）、`PORT`（默认 `3000`）。
 另：`META_TENANT` / `META_ENV`（都设了才开启发布-重载闭环，见下）。
 
+## 协议面
+
+`impl/bootstrap.js` 的 `skins` 块由脚手架按所选协议皮生成（`--skins`，至少 1 个），依赖包随之写入 `package.json`：
+
+| 皮 | 依赖包 | 装配子选项 | 端点 |
+|---|---|---|---|
+| `rest`（默认） | `store-api-node` | `prefix`（默认 `/api`） | `GET /api/<Model>` |
+| `graphql` | `store-graphql-node` | `path`（默认 `/graphql`） | `POST /graphql` |
+| `grpc` | `store-grpc-node` | `port`（默认 `GRPC_PORT` / 50051） | gRPC |
+
+`http` 键固定启用（`PORT`，默认 3000），不属协议皮。脚手架默认只装 `rest`，其余皮在 `--skins` 中显式选择。
+
 ## schema 目录约定
 
 定义按「一个文件一个 schema（或文件内数组）」组织，脚本递归发现：

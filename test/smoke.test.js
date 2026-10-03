@@ -87,3 +87,67 @@ test('publish-defs 递归收集：子目录→namespace、`_` 忽略、同名报
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('--yes 默认：node + rest（依赖补齐 store-api-node + skins 装配）', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'create-store-app-'));
+  const target = path.join(dir, 'demo');
+  const r = spawnSync(process.execPath, [CLI, target, '--yes'], { encoding: 'utf8' });
+  try {
+    assert.strictEqual(r.status, 0, r.stderr);
+    const pkg = JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8'));
+    assert.ok(pkg.dependencies['store-api-node'], 'store-api-node 缺失（rest 已启用却未声明）');
+    const boot = fs.readFileSync(path.join(target, 'impl', 'bootstrap.js'), 'utf8');
+    assert.ok(boot.includes("rest: { enabled: true, prefix: '/api' }"), 'rest 装配缺失');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--lang node --skins rest,graphql,grpc：三皮包 + 三装配', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'create-store-app-'));
+  const target = path.join(dir, 'demo');
+  const r = spawnSync(process.execPath, [CLI, target, '--lang', 'node', '--skins', 'rest,graphql,grpc', '--yes'], { encoding: 'utf8' });
+  try {
+    assert.strictEqual(r.status, 0, r.stderr);
+    const pkg = JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8'));
+    for (const k of ['store-api-node', 'store-graphql-node', 'store-grpc-node']) {
+      assert.ok(pkg.dependencies[k], 'missing ' + k);
+    }
+    const boot = fs.readFileSync(path.join(target, 'impl', 'bootstrap.js'), 'utf8');
+    assert.ok(boot.includes("rest: { enabled: true, prefix: '/api' }"));
+    assert.ok(boot.includes("graphql: { enabled: true, path: '/graphql' }"));
+    assert.ok(boot.includes('grpc: { enabled: true, port:'));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--lang python --skins rest,graphql：gateway extras + import + build 调用', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'create-store-app-'));
+  const target = path.join(dir, 'demo');
+  const r = spawnSync(process.execPath, [CLI, target, '--lang', 'python', '--skins', 'rest,graphql', '--yes'], { encoding: 'utf8' });
+  try {
+    assert.strictEqual(r.status, 0, r.stderr);
+    const pt = fs.readFileSync(path.join(target, 'pyproject.toml'), 'utf8');
+    assert.ok(pt.includes('"store-gateway-py[rest,graphql]"'), 'gateway extras 缺失');
+    const boot = fs.readFileSync(path.join(target, 'impl', 'bootstrap.py'), 'utf8');
+    assert.ok(boot.includes('from store_gateway import build'), 'import 缺失');
+    assert.ok(boot.includes('gw = build(store,'), 'build 调用缺失');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('参数错误 / 非 TTY：bogus ⇒ 2；非交互无 --lang --yes ⇒ 2', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'create-store-app-'));
+  const target = path.join(dir, 'demo');
+  try {
+    const bad = spawnSync(process.execPath, [CLI, target, '--skins', 'bogus', '--yes'], { encoding: 'utf8' });
+    assert.strictEqual(bad.status, 2);
+    assert.ok(bad.stderr.includes('ERR_ARGS'), 'stderr 缺 ERR_ARGS');
+    const noTty = spawnSync(process.execPath, [CLI], { encoding: 'utf8' });
+    assert.strictEqual(noTty.status, 2);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
