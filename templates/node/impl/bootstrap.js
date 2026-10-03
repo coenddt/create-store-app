@@ -1,4 +1,5 @@
 const schemas = require('../schema/Order.json');
+const fns = require('./fns');
 const { createApp } = require('nodejs-store');
 const { MongoClient } = require('mongodb');
 
@@ -8,6 +9,7 @@ const { MongoClient } = require('mongodb');
   await createApp({
     datasource: client.db(process.env.MONGO_DB || '__APP_NAME__'),
     schemas: Array.isArray(schemas) ? schemas : [schemas],
+    fns,
     skins: {
       http: { port: Number(process.env.PORT || 3000) },
       rest: { enabled: true, prefix: '/api' },

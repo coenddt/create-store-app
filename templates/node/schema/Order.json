@@ -7,5 +7,8 @@
     "title": { "type": "string" },
     "amount": { "type": "number" },
     "status": { "type": "string" }
+  },
+  "computes": {
+    "amountLabel": { "fnRef": "amountLabel", "type": "string" }
   }
 }
