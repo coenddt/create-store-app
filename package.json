@@ -1,0 +1,9 @@
+{
+  "name": "create-store-app",
+  "version": "0.1.0",
+  "description": "Scaffold a data-driven app on common-store (nodejs-store / storepy)",
+  "bin": { "create-store-app": "bin/create.js" },
+  "files": ["bin", "templates"],
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}
