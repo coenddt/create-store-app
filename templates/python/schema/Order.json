@@ -1,6 +1,7 @@
 {
   "name": "Order",
   "description": "订单（示例模型）",
+  "idPrefix": "o",
   "fields": {
     "_id": { "type": "string" },
     "title": { "type": "string" },
