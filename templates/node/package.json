@@ -4,7 +4,8 @@
   "private": true,
   "description": "Data-driven app scaffolded by create-store-app",
   "scripts": {
-    "start": "node impl/bootstrap.js"
+    "start": "node impl/bootstrap.js",
+    "defs:publish": "node scripts/publish-defs.js"
   },
   "dependencies": {
     "nodejs-store": "^3.3.0",
