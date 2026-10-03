@@ -24,5 +24,6 @@ if (!META_URL) { console.error('ERR:PUBLISH 需要 META_URL'); process.exit(1); 
       console.error(`[publish] ${f} ${defn.name} 失败 ${r.status} ${await r.text()}`);
     }
   }
-  process.exit(failed ? 1 : 0);
+  // 用 exitCode 而非 process.exit：立即退出会在 undici 句柄关闭途中触发 libuv 断言（Windows）
+  process.exitCode = failed ? 1 : 0;
 })();

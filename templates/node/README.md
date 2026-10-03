@@ -25,13 +25,19 @@ curl http://127.0.0.1:3000/api/Order
 ```
 
 环境变量：`MONGO_URI`（默认 `mongodb://127.0.0.1:27017`）、`MONGO_DB`（默认 `__APP_NAME__`）、`PORT`（默认 `3000`）。
+另：`META_TENANT` / `META_ENV`（都设了才开启发布-重载闭环，见下）。
 
 ## 发布定义
 
-把 `schema/` 下定义发布到 meta-store（发布后经 `POST /-/reload` 才对协议面可见）：
+把 `schema/` 下定义发布到 meta-store，再 `POST /-/reload` 使新定义对协议面可见：
 
 ```bash
+# 业务进程（需设 META_TENANT / META_ENV 才开启 reload 重建）
+META_TENANT=dev META_ENV=local npm start
+# 发布定义（META_DB 须与业务进程的 MONGO_DB 同库，二者共用 __schemaDef 表）
 META_URL=http://127.0.0.1:8600 npm run defs:publish
+# 重装配（重建注册表后原子替换路由；业务进程 PID 不变）
+curl -X POST http://127.0.0.1:3000/-/reload
 ```
 
 环境变量：`META_URL`（必填，meta-store 地址）、`ACTOR`（默认 `ci`）。任一发布失败退出码 1。
