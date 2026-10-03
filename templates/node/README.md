@@ -27,6 +27,23 @@ curl http://127.0.0.1:3000/api/Order
 环境变量：`MONGO_URI`（默认 `mongodb://127.0.0.1:27017`）、`MONGO_DB`（默认 `__APP_NAME__`）、`PORT`（默认 `3000`）。
 另：`META_TENANT` / `META_ENV`（都设了才开启发布-重载闭环，见下）。
 
+## schema 目录约定
+
+定义按「一个文件一个 schema（或文件内数组）」组织，脚本递归发现：
+
+```
+schema/
+  Order.json          # name 取 defn.name，缺省回退文件名
+  Inventory/          # 子目录相对路径 → defn.namespace
+    Sku.json          #   ⇒ namespace = "Inventory"
+  _draft/             # `_` 前缀目录/文件忽略
+```
+
+- 递归发现 `schema/**/*.json`；`.json` 之外忽略。
+- 子目录 → `defn.namespace`（根目录下的文件不写 namespace）。
+- 同一 `name` 出现 ≥2 次 ⇒ 发布失败（持久化键为 `name`，禁静默覆盖）。
+- 预览将要发布的清单（不发请求）：`--dry-run`。
+
 ## 发布定义
 
 把 `schema/` 下定义发布到 meta-store，再 `POST /-/reload` 使新定义对协议面可见：
