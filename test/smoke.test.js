@@ -65,3 +65,25 @@ test('缺 target-dir → 退出码 2', () => {
   const r = spawnSync(process.execPath, [CLI], { encoding: 'utf8' });
   assert.strictEqual(r.status, 2);
 });
+
+test('publish-defs 递归收集：子目录→namespace、`_` 忽略、同名报错', () => {
+  const { collectDefs } = require(path.join(__dirname, '..', 'templates', 'node', 'scripts', 'publish-defs.js'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-defs-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'Inv'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '_draft'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'Order.json'), JSON.stringify({ name: 'Order', fields: {} }));
+    fs.writeFileSync(path.join(dir, 'Inv', 'Item.json'), JSON.stringify({ name: 'Item', fields: {} }));
+    fs.writeFileSync(path.join(dir, '_draft', 'Hidden.json'), JSON.stringify({ name: 'Hidden', fields: {} }));
+    const defs = collectDefs(dir);
+    assert.deepStrictEqual(defs.map((d) => d.rel), ['Inv/Item.json', 'Order.json']);
+    assert.strictEqual(defs[0].namespace, 'Inv');
+    assert.strictEqual(defs[0].defn.namespace, 'Inv');
+    assert.strictEqual(defs[1].namespace, undefined);
+    // 同名重复 → 显式报错
+    fs.writeFileSync(path.join(dir, 'Inv', 'Order.json'), JSON.stringify({ name: 'Order', fields: {} }));
+    assert.throws(() => collectDefs(dir), /同名定义重复/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
