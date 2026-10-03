@@ -21,3 +21,16 @@ python impl/bootstrap.py
 ```
 
 环境变量：`MONGO_URI`（默认 `mongodb://127.0.0.1:27017`）、`MONGO_DB`（默认 `__APP_NAME__`）。
+
+## 降级事件如何查
+
+运行期的降级 / 拦截 / 兜底事件统一落内建 `__feedback`（`create_app` 默认接线，`feedback=False` 可关），经数据层查询：
+
+```python
+rows = await app["store"].query(
+    "__feedback($condition:@c0){ code, type, layer, message, hint, tenant, env, now }",
+    {"c0": {}},
+)
+```
+
+字段：`type` / `code` / `layer` / `message` / `hint`（+ `tenant` / `env` / `now`）。该表 `write` 白名单为空——业务 GQL 不可篡改审计。

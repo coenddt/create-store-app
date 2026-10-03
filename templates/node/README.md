@@ -41,3 +41,13 @@ curl -X POST http://127.0.0.1:3000/-/reload
 ```
 
 环境变量：`META_URL`（必填，meta-store 地址）、`ACTOR`（默认 `ci`）。任一发布失败退出码 1。
+
+## 降级事件如何查
+
+运行期的降级 / 拦截 / 兜底事件统一落内建 `__feedback`（`createApp` 默认接线，`feedback: false` 可关），可用 GQL 查询：
+
+```bash
+curl "http://127.0.0.1:3000/api/__feedback"
+```
+
+字段：`type` / `code` / `layer` / `message` / `hint`（+ `tenant` / `env` / `now`）。该表 `write` 白名单为空——业务 GQL 不可篡改审计。
