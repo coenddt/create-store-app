@@ -57,7 +57,7 @@ function resolveOptions(argv) {
   return o;
 }
 
-/** 一次性问答（交互问答的细节在后续增强） */
+/** 单次问答 */
 async function ask(prompt) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try { return await rl.question(prompt); } finally { rl.close(); }
@@ -74,8 +74,15 @@ async function askLang() {
 }
 
 async function askSkins() {
-  const v = (await ask('协议皮 (rest,graphql,grpc) [rest]: ')).trim() || DEFAULTS.skins.join(',');
-  return v.split(',').map((s) => s.trim()).filter(Boolean);
+  const picked = [];
+  for (const s of SKINS) {
+    const def = DEFAULTS.skins.includes(s);                 // rest 默认启用，其余默认关闭
+    const ans = (await ask(`启用协议皮 ${s}? ${def ? '(Y/n)' : '(y/N)'}: `)).trim().toLowerCase();
+    const on = ans === '' ? def : (ans === 'y' || ans === 'yes');
+    if (on) picked.push(s);
+  }
+  if (!picked.length) fail('ERR_ARGS', '至少选择 1 个协议皮');
+  return picked;
 }
 
 /** 递归复制模板并做占位符替换（内容替换；文件名保持不变） */
@@ -119,7 +126,10 @@ async function main() {
   if (fs.existsSync(target)) {
     if (!fs.statSync(target).isDirectory()) fail('ERR_TARGET_EXISTS', `目标已存在且不是目录：${target}`);
     if (fs.readdirSync(target).length > 0 && !o.force) {
-      fail('ERR_TARGET_EXISTS', `目标目录已存在且非空（加 --force 覆盖）：${target}`);
+      // 非交互（--yes / 非 TTY）不覆盖，沿用退出码 3；TTY 时询问是否覆盖（等价 --force）
+      if (o.yes || !process.stdin.isTTY) fail('ERR_TARGET_EXISTS', `目标目录已存在且非空（加 --force 覆盖）：${target}`);
+      const yn = (await ask('目标目录已存在且非空，覆盖？(y/N): ')).trim().toLowerCase();
+      if (yn !== 'y' && yn !== 'yes') fail('ERR_TARGET_EXISTS', `目标目录已存在且非空（加 --force 覆盖）：${target}`);
     }
   }
 
