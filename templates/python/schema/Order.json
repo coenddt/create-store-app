@@ -9,6 +9,6 @@
     "status": { "type": "string" }
   },
   "computes": {
-    "amountLabel": { "fnRef": "amountLabel", "type": "string" }
+    "amountLabel": { "fn": true, "fnRef": "amountLabel", "type": "string", "depends": ["amount"] }
   }
 }
