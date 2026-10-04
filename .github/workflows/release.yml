@@ -41,6 +41,8 @@ jobs:
           fi
       - name: Test
         run: npm test
+      - name: Check SPEC snippets (carrier consistency)
+        run: node tools/check-spec-snippets.js
       - name: Pack & inspect
         run: npm pack --dry-run
       - name: Publish

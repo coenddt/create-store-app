@@ -1,9 +1,9 @@
 {
   "name": "create-store-app",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Scaffold a data-driven app on common-store (nodejs-store / storepy)",
   "bin": { "create-store-app": "bin/create.js" },
-  "files": ["bin", "templates"],
+  "files": ["bin", "templates", "CHANGELOG.md"],
   "scripts": { "test": "node --test" },
   "engines": { "node": ">=18" },
   "repository": {

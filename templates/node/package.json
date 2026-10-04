@@ -8,7 +8,7 @@
     "defs:publish": "node scripts/publish-defs.js"
   },
   "dependencies": {
-    "nodejs-store": "^3.3.0",
+    "nodejs-store": "^4.0.0",
     "store-gateway-node": "^0.1.0",
     "mongodb": "^6.21.0"
     __SKIN_DEPS__
