@@ -78,8 +78,17 @@ test('缺 target-dir → 退出码 2', () => {
   assert.strictEqual(r.status, 2);
 });
 
-test('publish-defs 目录语义：落点（L1=db、PG L2=schema、L3 打平）+ 主从 + `_`/非 .json 忽略 + 同名主 ≥2 报错', () => {
-  const { planDefs } = require(path.join(__dirname, '..', 'templates', 'node', 'scripts', 'publish-defs.js'));
+test('publish-defs 目录语义：落点（L1=db、PG L2=schema、L3 打平）+ 主从 + `_`/非 .json 忽略 + 同名主 ≥2 报错', (t) => {
+  let planDefs;
+  try {
+    ({ planDefs } = require(path.join(__dirname, '..', 'templates', 'node', 'scripts', 'publish-defs.js')));
+  } catch (e) {
+    // 模板脚本顶层 require('nodejs-store')：本仓不装依赖，靠 NODE_PATH 指向相邻
+    // nodejs-store 仓（仅 monorepo 布局可满足）。CI 单仓 checkout 下显式跳过并上报，
+    // 不静默失守（本地/CI 均可从测试输出看到 skip）。
+    if (e.code !== 'MODULE_NOT_FOUND') throw e;
+    return t.skip('跳过：未解析到 nodejs-store（需 monorepo 相邻仓布局）');
+  }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-defs-'));
   try {
     fs.mkdirSync(path.join(dir, 'schema', 'sales_db', 'inventory'), { recursive: true });
