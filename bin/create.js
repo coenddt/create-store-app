@@ -127,6 +127,10 @@ function pySkinsBlock(skins) {
   return `    gw = ${call}\n    gw.run("127.0.0.1", int(os.environ.get("PORT", "3000")))`;
 }
 
+/** node 依赖注入点：模板内为一个合法 JSON 成员（含前导逗号），无皮时整体移除以保持 JSON 合法。
+ *  用正则匹配以避免 CRLF / 缩进差异导致标记失配。 */
+const NODE_SKIN_DEPS_RE = /,\s*"__SKIN_DEPS__"\s*:\s*"[^"]*"/;
+
 /** node 依赖注入：直接加皮包（替换文本以逗号开头，无皮为空以保持 JSON 合法） */
 function nodeDepsReplacement(skins) {
   return skins.map((s) => `,\n    "${NODE_SKIN_PKG[s]}": "^0.1.0"`).join('');
@@ -159,8 +163,11 @@ function applySkins(target, lang, skins) {
   if (lang === 'node') {
     replaceFile(path.join(target, 'impl', 'bootstrap.js'),
       (t) => replaceBlock(t, '// __SKINS_START__', '// __SKINS_END__', nodeSkinsBlock(skins)));
-    replaceFile(path.join(target, 'package.json'),
-      (t) => replaceLiteral(t, '__SKIN_DEPS__', nodeDepsReplacement(skins)));
+    replaceFile(path.join(target, 'package.json'), (t) => {
+      // 标记缺失即抛 ERR_TEMPLATE，不静默
+      if (!NODE_SKIN_DEPS_RE.test(t)) throw new Error('ERR_TEMPLATE 标记缺失：__SKIN_DEPS__');
+      return t.replace(NODE_SKIN_DEPS_RE, nodeDepsReplacement(skins));
+    });
   } else {
     replaceFile(path.join(target, 'impl', 'bootstrap.py'), (t) => {
       const out = replaceBlock(t, '# __SKINS_IMPORT_START__', '# __SKINS_IMPORT_END__', pySkinsImportBlock(skins));
