@@ -2,7 +2,7 @@
 
 /**
  * create-store-app 冒烟用例：生成到临时目录并校验关键文件存在 / 退出码契约。
- * 语义依据：01 文档 §3.1 / §4.2。
+ * 语义依据：01 文档 §3.1 / §4.2；共享分层与多落点择优 06 §4.8（目录语义 + 主从）。
  */
 
 const test = require('node:test');
@@ -10,9 +10,18 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const Module = require('node:module');
 const { spawnSync } = require('node:child_process');
 
 const CLI = path.join(__dirname, '..', 'bin', 'create.js');
+
+// 模板 scripts/publish-defs.js 顶层 `require('nodejs-store')`：本仓未装依赖，
+// 经 NODE_PATH 指向相邻 nodejs-store 仓（其 package name = nodejs-store）+ LOCAL_CORE=1
+// 加载相邻 rust-store 调试产物（与 nodejs-store 自身用例同口径）。
+process.env.LOCAL_CORE = '1';
+process.env.NODE_PATH = [process.env.NODE_PATH, path.join(__dirname, '..', '..')]
+  .filter(Boolean).join(path.delimiter);
+Module._initPaths();
 
 function gen(lang) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'create-store-app-'));
@@ -25,12 +34,15 @@ test('node 模板：生成关键文件 + __APP_NAME__ 替换为 basename', () =>
   const { dir, target, r } = gen('node');
   try {
     assert.strictEqual(r.status, 0, r.stderr);
-    for (const f of ['package.json', 'schema/Order.json', 'impl/bootstrap.js', 'seed/seed.json', 'cases/smoke.json', 'README.md']) {
+    for (const f of ['package.json', 'store.config.json', 'schema/demo/Order.json', 'impl/bootstrap.js', 'seed/seed.json', 'cases/smoke.json', 'README.md']) {
       assert.ok(fs.existsSync(path.join(target, f)), 'missing ' + f);
     }
     const pkg = fs.readFileSync(path.join(target, 'package.json'), 'utf8');
     assert.ok(!pkg.includes('__APP_NAME__'), '__APP_NAME__ 未替换');
     assert.ok(pkg.includes('"demo"'), 'basename 未写入');
+    // store.config.json 内 __APP_NAME__ 亦被替换为 basename
+    const cfg = JSON.parse(fs.readFileSync(path.join(target, 'store.config.json'), 'utf8'));
+    assert.deepStrictEqual(cfg.sources.default.databases, ['demo']);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -40,7 +52,7 @@ test('python 模板：生成关键文件', () => {
   const { dir, target, r } = gen('python');
   try {
     assert.strictEqual(r.status, 0, r.stderr);
-    for (const f of ['pyproject.toml', 'schema/Order.json', 'impl/bootstrap.py', 'seed/seed.json', 'cases/smoke.json', 'README.md']) {
+    for (const f of ['pyproject.toml', 'store.config.json', 'schema/demo/Order.json', 'impl/bootstrap.py', 'seed/seed.json', 'cases/smoke.json', 'README.md']) {
       assert.ok(fs.existsSync(path.join(target, f)), 'missing ' + f);
     }
   } finally {
@@ -66,23 +78,53 @@ test('缺 target-dir → 退出码 2', () => {
   assert.strictEqual(r.status, 2);
 });
 
-test('publish-defs 递归收集：子目录→namespace、`_` 忽略、同名报错', () => {
-  const { collectDefs } = require(path.join(__dirname, '..', 'templates', 'node', 'scripts', 'publish-defs.js'));
+test('publish-defs 目录语义：落点（L1=db、PG L2=schema、L3 打平）+ 主从 + `_`/非 .json 忽略 + 同名主 ≥2 报错', () => {
+  const { planDefs } = require(path.join(__dirname, '..', 'templates', 'node', 'scripts', 'publish-defs.js'));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-defs-'));
   try {
-    fs.mkdirSync(path.join(dir, 'Inv'), { recursive: true });
-    fs.mkdirSync(path.join(dir, '_draft'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'Order.json'), JSON.stringify({ name: 'Order', fields: {} }));
-    fs.writeFileSync(path.join(dir, 'Inv', 'Item.json'), JSON.stringify({ name: 'Item', fields: {} }));
-    fs.writeFileSync(path.join(dir, '_draft', 'Hidden.json'), JSON.stringify({ name: 'Hidden', fields: {} }));
-    const defs = collectDefs(dir);
-    assert.deepStrictEqual(defs.map((d) => d.rel), ['Inv/Item.json', 'Order.json']);
-    assert.strictEqual(defs[0].namespace, 'Inv');
-    assert.strictEqual(defs[0].defn.namespace, 'Inv');
-    assert.strictEqual(defs[1].namespace, undefined);
-    // 同名重复 → 显式报错
-    fs.writeFileSync(path.join(dir, 'Inv', 'Order.json'), JSON.stringify({ name: 'Order', fields: {} }));
-    assert.throws(() => collectDefs(dir), /同名定义重复/);
+    fs.mkdirSync(path.join(dir, 'schema', 'sales_db', 'inventory'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'schema', 'sales_db', '_draft'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'schema', 'analytics_db', 'app', 'report'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'store.config.json'), JSON.stringify({
+      sources: {
+        mongoMain: { kind: 'mongodb', databases: ['sales_db'] },
+        pgMain: { kind: 'pg', databases: ['analytics_db'] },
+      },
+      defs: ['schema'],
+    }));
+    fs.writeFileSync(path.join(dir, 'schema', 'sales_db', 'Order.json'), JSON.stringify({ name: 'Order', fields: {} }));
+    fs.writeFileSync(path.join(dir, 'schema', 'sales_db', 'inventory', 'Item.json'), JSON.stringify({ name: 'Item', fields: {} }));           // Mongo：L2 打平
+    fs.writeFileSync(path.join(dir, 'schema', 'sales_db', '_draft', 'Hidden.json'), JSON.stringify({ name: 'Hidden', fields: {} }));         // `_` 前缀忽略
+    fs.writeFileSync(path.join(dir, 'schema', 'sales_db', 'note.txt'), 'x');                                                                 // 非 .json 忽略
+    fs.writeFileSync(path.join(dir, 'schema', 'analytics_db', 'Order.json'), JSON.stringify({ name: 'Order', replica: true }));              // 从：同名主在 sales_db
+    fs.writeFileSync(path.join(dir, 'schema', 'analytics_db', 'app', 'Customer.json'), JSON.stringify({ name: 'Customer', fields: {} }));    // PG：L2 = schema
+    fs.writeFileSync(path.join(dir, 'schema', 'analytics_db', 'app', 'report', 'Monthly.json'), JSON.stringify({ name: 'Monthly', fields: {} })); // PG：L3 打平
+
+    const items = planDefs(path.join(dir, 'store.config.json'));
+    const locOf = (n) => {
+      const hit = items.find((it) => it.defn.name === n && !it.defn.replica);
+      return hit && hit.location;
+    };
+
+    // L1 = database；Mongo L2 打平；PG L2 = schema；PG L3 打平
+    assert.deepStrictEqual(locOf('Order'), { source: 'mongoMain', database: 'sales_db', schema: null });
+    assert.deepStrictEqual(locOf('Item'), { source: 'mongoMain', database: 'sales_db', schema: null });
+    assert.deepStrictEqual(locOf('Customer'), { source: 'pgMain', database: 'analytics_db', schema: 'app' });
+    assert.deepStrictEqual(locOf('Monthly'), { source: 'pgMain', database: 'analytics_db', schema: 'app' });
+    // `_` 前缀与 `.json` 之外不收集
+    assert.strictEqual(items.some((it) => it.defn.name === 'Hidden'), false);
+
+    // 主从识别：同名 Order ⇒ 主在前、其后从
+    const ordIdxs = items.map((it, i) => (it.defn.name === 'Order' ? i : -1)).filter((i) => i >= 0);
+    assert.strictEqual(ordIdxs.length, 2);
+    assert.strictEqual(items[ordIdxs[0]].defn.replica, undefined);
+    assert.strictEqual(items[ordIdxs[0]].location.database, 'sales_db');
+    assert.strictEqual(items[ordIdxs[1]].defn.replica, true);
+    assert.strictEqual(items[ordIdxs[1]].location.database, 'analytics_db');
+
+    // 同名主 ≥2 ⇒ ERR:LOAD 主定义重复
+    fs.writeFileSync(path.join(dir, 'schema', 'sales_db', 'inventory', 'Order.json'), JSON.stringify({ name: 'Order', fields: {} }));
+    assert.throws(() => planDefs(path.join(dir, 'store.config.json')), /ERR:LOAD 主定义重复/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

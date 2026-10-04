@@ -1,0 +1,4 @@
+{
+  "sources": { "default": { "kind": "mongodb", "databases": ["__APP_NAME__"] } },
+  "defs": ["schema"]
+}

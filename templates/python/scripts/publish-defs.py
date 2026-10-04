@@ -1,9 +1,12 @@
-"""把 schema/ 目录下定义（递归）发布到 meta-store。
+"""把 schema 定义发布到 meta-store。
 
-目录约定：schema/**/*.json；子目录相对路径 → defn.namespace；`_` 前缀文件/目录忽略。
+落点（source/database/schema）与主从由「目录 + store.config.json」决定，
+判据唯一在 core（经宿主 ``py_store.load`` 的 ``plan_load`` 纯规划），本脚本不写落点/主从谓词。
+仅发布主定义（``replica: true`` 的从定义只声明链路，不进控制面）。
+
 环境变量：META_URL（必填）；ACTOR（默认 ci）。
-用法：python scripts/publish-defs.py [--dry-run]   失败（含同名重复）退出码 1（不静默）。
-仅用标准库（urllib），不新增依赖。
+用法：python scripts/publish-defs.py [--dry-run]   失败（含 ERR:LOAD）退出码 1（不静默）。
+对外请求仅用标准库（urllib）。
 """
 
 import json
@@ -12,34 +15,19 @@ import sys
 import urllib.request
 from pathlib import Path
 
-SCHEMA_DIR = Path(__file__).resolve().parent.parent / 'schema'
+from py_store import load
+
+CONFIG_FILE = Path(__file__).resolve().parent.parent / 'store.config.json'
 
 
-def collect_defs(schema_dir=SCHEMA_DIR):
-    """递归收集定义：返回 [{rel, name, namespace, defn}]（可单测：纯 IO + 映射，无网络）。"""
-    schema_dir = Path(schema_dir)
-    if not schema_dir.is_dir():
-        raise RuntimeError(f'ERR:PUBLISH schema 目录不存在：{schema_dir}')
-    out, seen = [], {}
-    for abs_path in sorted(schema_dir.rglob('*.json')):
-        parts = abs_path.relative_to(schema_dir).parts
-        if any(p.startswith('_') for p in parts):              # `_` 前缀忽略
-            continue
-        rel = '/'.join(parts)
-        namespace = '/'.join(parts[:-1]) or None               # 子目录 → namespace
-        raw = json.loads(abs_path.read_text(encoding='utf8'))
-        for defn in (raw if isinstance(raw, list) else [raw]):
-            name = defn.get('name') or abs_path.stem
-            if name in seen:
-                raise RuntimeError(
-                    f'ERR:PUBLISH 同名定义重复：{name}（{seen[name]} 与 {rel}）——持久化键为 name，禁覆盖'
-                )
-            seen[name] = rel
-            merged = dict(defn, name=name)
-            if namespace:
-                merged['namespace'] = namespace
-            out.append({'rel': rel, 'name': name, 'namespace': namespace, 'defn': merged})
-    return out
+def plan_defs(config_path=CONFIG_FILE):
+    """读 store.config.json → 按 defs 根收集定义（宿主 load 的 IO：``_`` 前缀忽略、仅 .json）
+    → core 纯规划落点与主从。返回装载项 ``[{defn, location}]``（主在前、其后从）。
+    """
+    cfg, base_dir = load.read_config(str(config_path))
+    roots = [os.path.abspath(os.path.join(base_dir, r)) for r in (cfg.get('defs') or [])]
+    files = load.collect_files(roots)
+    return load.plan_load(cfg, files)
 
 
 def main(argv=None):
@@ -49,31 +37,34 @@ def main(argv=None):
         print('ERR:PUBLISH 需要 META_URL', file=sys.stderr)
         return 1
     try:
-        defs = collect_defs()
-    except Exception as e:                                     # 同名重复 / 目录缺失
+        items = plan_defs()
+    except Exception as e:                                     # ERR:LOAD（主重复 / 库未声明 / kind 非法…）
         print(str(e), file=sys.stderr)
         return 1
+    masters = [it for it in items if not (it.get('defn') or {}).get('replica')]  # 只发布主定义
     failed = 0
-    for d in defs:
+    for it in masters:
+        defn = it['defn']
+        loc = it.get('location') or {}
+        place = '/'.join(str(loc[k]) for k in ('source', 'database', 'schema') if loc.get(k))
         if dry_run:
-            suffix = f" ns={d['namespace']}" if d['namespace'] else ''
-            print(f"[dry] {d['rel']} {d['name']}{suffix}")
+            print(f"[dry] {defn.get('name')} {place}")
             continue
         req = urllib.request.Request(
             f"{os.environ['META_URL']}/meta/defs",
-            data=json.dumps({'defn': d['defn'], 'actor': os.environ.get('ACTOR', 'ci')}).encode('utf8'),
+            data=json.dumps({'defn': defn, 'actor': os.environ.get('ACTOR', 'ci')}).encode('utf8'),
             headers={'content-type': 'application/json'},
             method='POST',
         )
         try:
             with urllib.request.urlopen(req) as r:
                 if r.status < 300:
-                    print(f"[publish] {d['rel']} {d['name']} ok")
+                    print(f"[publish] {defn.get('name')} {place} ok")
                     continue
                 raise RuntimeError(str(r.status))
         except Exception as e:
             failed += 1
-            print(f"[publish] {d['rel']} {d['name']} 失败 {e}", file=sys.stderr)
+            print(f"[publish] {defn.get('name')} 失败 {e}", file=sys.stderr)
     return 1 if failed else 0
 
 

@@ -9,7 +9,7 @@
  *   - 无 <target-dir> 且为 TTY 时进入交互问答；--yes 全取默认（node + rest）。
  *   - 退出码：0 成功 / 2 参数错误 / 3 目标目录已存在且无 --force。
  *   - 生成方式：复制 templates/<lang>/** 到目标目录，占位符 __APP_NAME__ 替换为
- *     <target-dir> 的 basename（仅替换文件内容，不改文件名）。
+ *     <target-dir> 的 basename（文件内容与路径名都替换，如 schema/__APP_NAME__/）。
  */
 
 const fs = require('fs');
@@ -85,12 +85,13 @@ async function askSkins() {
   return picked;
 }
 
-/** 递归复制模板并做占位符替换（内容替换；文件名保持不变） */
+/** 递归复制模板并做占位符替换（文件内容与路径名都替换） */
 function copyTree(srcDir, dstDir, appName) {
   fs.mkdirSync(dstDir, { recursive: true });
   for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const name = entry.name.split(PLACEHOLDER).join(appName);
     const src = path.join(srcDir, entry.name);
-    const dst = path.join(dstDir, entry.name);
+    const dst = path.join(dstDir, name);
     if (entry.isDirectory()) {
       copyTree(src, dst, appName);
     } else {
