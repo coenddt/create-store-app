@@ -1,11 +1,21 @@
 {
   "name": "create-store-app",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Scaffold a data-driven app on common-store (nodejs-store / storepy)",
-  "bin": { "create-store-app": "bin/create.js" },
-  "files": ["bin", "templates", "CHANGELOG.md"],
-  "scripts": { "test": "node --test" },
-  "engines": { "node": ">=18" },
+  "bin": {
+    "create-store-app": "bin/create.js"
+  },
+  "files": [
+    "bin",
+    "templates",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/coenddt/create-store-app.git"
