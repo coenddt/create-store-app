@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 (2026-10-08)
+
+### Changed
+
+- **版本声明点调整**：`package.json` 格式化与版本号调整（无功能变更）。
+
 ## 0.2.0 (2026-10-04)
 
 ### Breaking（定义零落点 / 目录即落点 / 依赖下限抬升）
@@ -19,3 +25,16 @@
 ### Docs
 
 - 模板 README 与顶层 README 写入「定义目录与落点约定」（`SPEC:LOCATION` 片段），并由 `tools/check-spec-snippets.js` 在 CI 校验各载体逐字一致。
+
+## 0.1.1 (2026-10-04)
+
+### Added
+
+- **模板 schema 补 `idPrefix`**：`POST` 可自动生成 `_id`。
+
+## 0.1.0 (2026-10-04)
+
+### Added（首发）
+
+- **脚手架首发**：`create-store-app` CLI 生成逻辑（node / python 模板）、仓库骨架，及冒烟用例与
+  npm release 链路（`repository` 字段以过 provenance 校验）。
