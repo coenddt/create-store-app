@@ -116,10 +116,11 @@ test('publish-defs 目录语义：落点（L1=db、PG L2=schema、L3 打平）+ 
     };
 
     // L1 = database；Mongo L2 打平；PG L2 = schema；PG L3 打平
-    assert.deepStrictEqual(locOf('Order'), { source: 'mongoMain', database: 'sales_db', schema: null });
-    assert.deepStrictEqual(locOf('Item'), { source: 'mongoMain', database: 'sales_db', schema: null });
-    assert.deepStrictEqual(locOf('Customer'), { source: 'pgMain', database: 'analytics_db', schema: 'app' });
-    assert.deepStrictEqual(locOf('Monthly'), { source: 'pgMain', database: 'analytics_db', schema: 'app' });
+    // 02 起 Location 五元组：role/priority 未声明 ⇒ null（对齐 nodejs-store tests/load.test.js）
+    assert.deepStrictEqual(locOf('Order'), { source: 'mongoMain', database: 'sales_db', schema: null, role: null, priority: null });
+    assert.deepStrictEqual(locOf('Item'), { source: 'mongoMain', database: 'sales_db', schema: null, role: null, priority: null });
+    assert.deepStrictEqual(locOf('Customer'), { source: 'pgMain', database: 'analytics_db', schema: 'app', role: null, priority: null });
+    assert.deepStrictEqual(locOf('Monthly'), { source: 'pgMain', database: 'analytics_db', schema: 'app', role: null, priority: null });
     // `_` 前缀与 `.json` 之外不收集
     assert.strictEqual(items.some((it) => it.defn.name === 'Hidden'), false);
 
