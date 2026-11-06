@@ -6,6 +6,8 @@
 [![node](https://img.shields.io/badge/node-%3E%3D18-339933)](https://nodejs.org)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/coenddt/create-store-app/blob/main/LICENSE)
 
+> English: [README.en.md](./README.en.md)
+
 - 输入：目标目录、语言、协议皮；输出：一个能 `npm start` 或 `python impl/bootstrap.py` 的完整工程。
 - 生成物自带示例 schema、计算列实现、种子数据、冒烟用例与定义发布脚本。
 - 它不写业务逻辑，不做数据库迁移，不内置认证——这些留给你。
