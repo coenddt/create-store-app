@@ -148,6 +148,23 @@ node bin/store-app.js list          # 打印版本、可用语言、可用协议
 
 本仓自测即 `npm test`（等价 `node --test`）：9 条用例覆盖两种模板的生成、占位符替换、三种皮的注入与 `0/2/3` 退出码契约，当前全部通过。
 
+## 规范片段（SPEC）
+
+以下契约由 `tools/check-spec-snippets.js` 在三处载体间逐段校验，原文照录。
+
+<!-- SPEC:LOCATION:BEGIN -->
+### Location: directory semantics + connection config (definitions carry no location)
+
+A schema definition file contains no location fields (no `source` / `database` / `schema`; `namespace` is removed). Location is resolved from the definition directory layout plus the connection config:
+
+- Under the definitions root `<defs-root>/`: the first directory level is the `database`; PostgreSQL adds a second level for `schema` (Mongo / MySQL / SQLite have no such level); deeper levels are free-form and flattened at load time (no hierarchy semantics).
+- The connection config (`store.config.json`) declares `sources` (`kind` + `databases`) and `defs`; `kind` decides whether that database directory is read one level deeper for `schema`.
+- Location fields are `source` / `database` / `schema` (PG only) / `collection`; the word `namespace` is removed.
+- Same-named schemas: exactly one primary (no `replica`); the rest declare `{ "name": "...", "replica": true }`, add only a link, and must not repeat the structure. Zero or two-or-more primaries is an error.
+- A duplicated `name` within one load batch is an error and the service does not start; re-loading the same `name` across versions bumps its version by 1.
+- Writes are synchronized within a single connection, across the primary plus all links, in one transaction; a write spanning a cross-connection link is explicitly rejected or degraded with a feedback event (never silent).
+<!-- SPEC:LOCATION:END -->
+
 ## 边界：什么时候不要用它
 
 - **不生成业务逻辑**：模板只有一张 `Order` 示例表；除 `amountLabel` 这个演示计算列外，没有任何领域代码。
